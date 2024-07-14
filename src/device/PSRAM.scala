@@ -93,6 +93,7 @@ class psramChisel extends Module {
   val state = withClockAndReset(io.sck.asClock, io.ce_n.asAsyncReset){RegInit(cmd_addr)}
 
   val cmd = withClockAndReset(io.sck.asClock, io.ce_n.asAsyncReset){RegInit(0.U(8.W))}
+  val cmd2 = withClockAndReset(io.sck.asClock, io.ce_n.asAsyncReset){RegInit(0.U(8.W))}
   val addr =  withClockAndReset(io.sck.asClock, io.ce_n.asAsyncReset){RegInit(0.U(24.W))}
 
   val waddr = Cat(Fill(8, 0.U), addr)
@@ -113,7 +114,7 @@ class psramChisel extends Module {
   pw.io.waddr := waddr
   pw.io.wdata := wwdata
   //pw.io.wenable := (state === writedata) && ((count === 16.U) || (count === 18.U) || (count === 22.U)) && (io.sck === false.B)
-  pw.io.wenable := io.ce_n && !RegNext(io.ce_n) && (count =/= 0.U) && (count <= 22.U)
+  pw.io.wenable := io.ce_n && !RegNext(io.ce_n) && (count =/= 0.U) && (count <= 24.U)
   pw.io.count := count
   pr.io.raddr := raddr
   rrdata := pr.io.rdata
@@ -130,16 +131,19 @@ class psramChisel extends Module {
             count := count + 1.U
          //}
           
-        }.elsewhen (count >= 8.U && count < 14.U) {
+        }.elsewhen(count < 10.U){
+            cmd2 := (cmd2 << 4) | Cat(Fill(4, 0.U), di)
+            count := count + 1.U
+        }.elsewhen (count >= 10.U && count < 16.U) {
           //when(io.sck === 1.U) {
             addr := (addr << 4) | Cat(Fill(20, 0.U), di(3), di(2), di(1), di(0))
             count := count + 1.U
          // }
           
-          when (count === 13.U) {
-            when (cmd === "h38".U(8.W)) {
+          when (count === 15.U) {
+            when (cmd2 === "h38".U(8.W)) {
               state := writedata
-            }.elsewhen (cmd === "heb".U(8.W)) {
+            }.elsewhen (cmd2 === "heb".U(8.W)) {
               
               state := dummy
             }
@@ -153,21 +157,21 @@ class psramChisel extends Module {
       is (writedata) {
         
           when (io.ce_n === false.B ) {
-            when (count === 14.U) {
+            when (count === 16.U) {
               wwdata := wwdata | Cat(Fill(24, 0.U), di, Fill(4, 0.U))
-            }.elsewhen (count === 15.U) {
-              wwdata := wwdata |  Cat(Fill(28, 0.U), di)
-            }.elsewhen (count === 16.U) {
-              wwdata := wwdata | Cat(Fill(16, 0.U), di, Fill(12, 0.U))
             }.elsewhen (count === 17.U) {
-              wwdata := wwdata | Cat(Fill(20, 0.U), di, Fill(8, 0.U))
+              wwdata := wwdata |  Cat(Fill(28, 0.U), di)
             }.elsewhen (count === 18.U) {
-              wwdata := wwdata | Cat(Fill(8, 0.U), di, Fill(20, 0.U))
+              wwdata := wwdata | Cat(Fill(16, 0.U), di, Fill(12, 0.U))
             }.elsewhen (count === 19.U) {
-              wwdata := wwdata | Cat(Fill(12, 0.U), di, Fill(16, 0.U))
+              wwdata := wwdata | Cat(Fill(20, 0.U), di, Fill(8, 0.U))
             }.elsewhen (count === 20.U) {
-              wwdata := wwdata |Cat(di,Fill(28, 0.U))
+              wwdata := wwdata | Cat(Fill(8, 0.U), di, Fill(20, 0.U))
             }.elsewhen (count === 21.U) {
+              wwdata := wwdata | Cat(Fill(12, 0.U), di, Fill(16, 0.U))
+            }.elsewhen (count === 22.U) {
+              wwdata := wwdata |Cat(di,Fill(28, 0.U))
+            }.elsewhen (count === 23.U) {
               wwdata := wwdata | Cat(Fill(4, 0.U), di, Fill(24, 0.U))
             }
             count := count + 1.U
@@ -182,10 +186,10 @@ class psramChisel extends Module {
       is (dummy) {
         //when (io.ce_n === false.B) {
           count := count + 1.U
-          when (count === 18.U) {
+          when (count === 21.U) {
             renable := true.B 
           }
-          when (count === 19.U) {
+          when (count === 22.U) {
           //count := count + 1.U
           
           Tenable := true.B 
@@ -200,26 +204,26 @@ class psramChisel extends Module {
         
           count := count + 1.U
           
-        when (count === 20.U) {
+        when (count === 23.U) {
             srdata := rrdata(7, 4)
-        }.elsewhen (count === 21.U) {
-          srdata := rrdata(3, 0)
-        }.elsewhen (count === 22.U) {
-          srdata := rrdata(15, 12)
-        }.elsewhen (count === 23.U) {
-          srdata := rrdata(11, 8)
         }.elsewhen (count === 24.U) {
-          srdata := rrdata(23, 20)
+          srdata := rrdata(3, 0)
         }.elsewhen (count === 25.U) {
-          srdata := rrdata(19, 16)
+          srdata := rrdata(15, 12)
         }.elsewhen (count === 26.U) {
-          srdata := rrdata(31, 28)
+          srdata := rrdata(11, 8)
         }.elsewhen (count === 27.U) {
+          srdata := rrdata(23, 20)
+        }.elsewhen (count === 28.U) {
+          srdata := rrdata(19, 16)
+        }.elsewhen (count === 29.U) {
+          srdata := rrdata(31, 28)
+        }.elsewhen (count === 30.U) {
 
           srdata := rrdata(27, 24)
           //wenable := false.B
           
-        }.elsewhen (count === 28.U) {
+        }.elsewhen (count === 30.U) {
           state := cmd_addr
         }
         
