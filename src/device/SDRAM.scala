@@ -65,7 +65,10 @@ class sdram_write extends BlackBox with HasBlackBoxInline  {
     |); 
     |import "DPI-C" function void sdram_write(input int waddr, input int wdata, input int dqm, input int scount);
     |always @(posedge clk) begin
-    |  if (wenable) sdram_write(waddr, {16'b0, wdata}, {30'b0,dqm}, {24'b0, scount});
+    |   if (wenable) begin 
+    |     sdram_write(waddr, {16'b0, wdata}, {30'b0,dqm}, {24'b0, scount});
+    |   end
+    |   
     |  
     |end
     |endmodule
@@ -87,19 +90,10 @@ class  sdram_read extends BlackBox with HasBlackBoxInline {
     | output  reg [15:0] rdata
     |); 
     |import "DPI-C" function void sdram_read(input int raddr ,output int rdata);
-    |reg [15:0] rdata_next;
+    |//reg [15:0] rdata_next;
     |always @(posedge clk) begin
     |  if (renable) begin
-    |    sdram_read(raddr, {16'b0, rdata_next});
-    |  end
-    |  else  begin
-    |     rdata_next = rdata;
-    |end
-    |end
-    |
-    |always @(posedge renable or negedge renable) begin
-    |  if (renable) begin
-    |    rdata <= rdata_next;
+    |    sdram_read(raddr, {16'b0, rdata});
     |  end
     |end
     |endmodule
@@ -123,7 +117,7 @@ class sdramChisel extends RawModule {
   
   val cmd = Cat(io.cs.asUInt, io.ras.asUInt, io.cas.asUInt, io.we.asUInt)
   
-  val count = withClockAndReset((~io.clk).asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
+  val count = withClockAndReset((io.clk).asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
   val cas_count = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
   val scount = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
 
@@ -148,22 +142,25 @@ class sdramChisel extends RawModule {
 
   val r_count = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
   val raddr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(32.W))}
+  val rraddr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(32.W))}
   val t_enable = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(false.B)}
   val is_read = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(false.B)}
 
+  val rrdata1 = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(16.W))}
+  val rrdata2 = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(16.W))}                              
   val sdram_rdata = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(16.W))}
   val dq = TriStateInBuf(io.dq, sdram_rdata, t_enable === true.B)
   val sdw = Module(new sdram_write)
-  sdw.io.wenable := Mux(((count > 0.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U), io.clk, 0.U)
+  sdw.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U), io.clk, 0.U)
   sdw.io.dqm := io.dqm
   sdw.io.wdata := dq
-  sdw.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a, 0.U) / 2.U
+  sdw.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
   sdw.io.scount := Mux(cmd === write, 1.U, scount)
   sdw.io.clk := io.clk
 
   val sdr = Module(new sdram_read)
-  sdr.io.renable := Mux(r_count > 0.U && cas_count === 0.U && cmd =/= burst_terminate, io.clk, 0.U)
-  sdr.io.raddr := raddr
+  sdr.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate, io.clk, 0.U)
+  sdr.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U), rraddr)
   sdr.io.clk := io.clk
   //wdata := io.dq
   /*when (cmd ===write) {
@@ -201,16 +198,28 @@ class sdramChisel extends RawModule {
   when (cmd === read) {
     r_count := Mux(burstlen === 0.U, 1.U, Mux(burstlen === 1.U, 2.U, Mux(burstlen === 2.U, 4.U, Mux(burstlen === 3.U, 8.U, 0.U))))
     cas_count := caslate - 1.U
-    raddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a, 0.U) / 2.U
+    rraddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+    raddr := 0.U
     is_read := true.B
-
+    //rrdata1 := sdr.io.rdata
+  
   }.elsewhen(cmd === nop && cas_count > 0.U) {
+    when (cas_count >= 1.U) {
+      raddr := raddr + 1.U
+      when (cas_count === 1.U) {
+        t_enable := true.B 
+      }
+    }.otherwise {
+      
+      raddr := raddr
+    }
     
+    sdram_rdata := sdr.io.rdata
+    //rrdata2 := sdr.io.rdata
     cas_count := cas_count - 1.U
   }.elsewhen(r_count > 0.U && cas_count === 0.U && cmd =/= burst_terminate) {
-     r_count := r_count - 1.U
-    t_enable := true.B
-    raddr := raddr + 2.U
+    r_count := r_count - 1.U
+    
     sdram_rdata := sdr.io.rdata
     when (r_count === 1.U) {
       is_read := false.B
