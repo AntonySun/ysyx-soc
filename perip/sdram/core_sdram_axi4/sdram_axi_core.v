@@ -42,7 +42,7 @@ module sdram_axi_core
     ,input  [  7:0]  inport_len_i
     ,input  [ 31:0]  inport_addr_i
     ,input  [ 31:0]  inport_write_data_i
-    ,input  [ 15:0]  sdram_data_input_i
+    ,input  [ 31:0]  sdram_data_input_i
 
     // Outputs
     ,output          inport_accept_o
@@ -55,10 +55,10 @@ module sdram_axi_core
     ,output          sdram_ras_o
     ,output          sdram_cas_o
     ,output          sdram_we_o
-    ,output [  1:0]  sdram_dqm_o
+    ,output [  3:0]  sdram_dqm_o
     ,output [ 12:0]  sdram_addr_o
     ,output [  1:0]  sdram_ba_o
-    ,output [ 15:0]  sdram_data_output_o
+    ,output [ 31:0]  sdram_data_output_o
     ,output          sdram_data_out_en_o
 );
 
@@ -94,7 +94,7 @@ localparam CMD_REFRESH       = 4'b0001;
 localparam CMD_LOAD_MODE     = 4'b0000;
 
 // Mode: Burst Length = 4 bytes, CAS=2
-localparam MODE_REG          = {3'b000,1'b0,2'b00,3'b010,1'b0,3'b001};
+localparam MODE_REG          = {3'b000,1'b0,2'b00,3'b010,1'b0,3'b000};
 
 // SM states
 localparam STATE_W           = 4;
@@ -153,9 +153,9 @@ assign inport_accept_o    = ram_accept_w;
 
 reg [CMD_W-1:0]        command_q;
 reg [SDRAM_ROW_W-1:0]  addr_q;
-reg [SDRAM_DATA_W-1:0] data_q;
+reg [32-1:0] data_q;
 reg                    data_rd_en_q;
-reg [SDRAM_DQM_W-1:0]  dqm_q;
+reg [4-1:0]  dqm_q;
 reg                    cke_q;
 reg [SDRAM_BANK_W-1:0] bank_q;
 
@@ -163,7 +163,7 @@ reg [SDRAM_BANK_W-1:0] bank_q;
 reg [SDRAM_DATA_W-1:0] data_buffer_q;
 reg [SDRAM_DQM_W-1:0]  dqm_buffer_q;
 
-wire [SDRAM_DATA_W-1:0] sdram_data_in_w;
+wire [32-1:0] sdram_data_in_w;
 
 reg                    refresh_q;
 
@@ -460,17 +460,17 @@ else if (state_q == STATE_REFRESH)
 // Input sampling
 //-----------------------------------------------------------------
 
-reg [SDRAM_DATA_W-1:0] sample_data0_q;
+reg [32-1:0] sample_data0_q;
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
-    sample_data0_q <= {SDRAM_DATA_W{1'b0}};
+    sample_data0_q <= {32{1'b0}};
 else
     sample_data0_q <= sdram_data_in_w;
 
-reg [SDRAM_DATA_W-1:0] sample_data_q;
+reg [32-1:0] sample_data_q;
 always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
-    sample_data_q <= {SDRAM_DATA_W{1'b0}};
+    sample_data_q <= {32{1'b0}};
 else
     sample_data_q <= sample_data0_q;
 
@@ -483,11 +483,11 @@ always @ (posedge clk_i or posedge rst_i)
 if (rst_i)
 begin
     command_q       <= CMD_NOP;
-    data_q          <= 16'b0;
+    data_q          <= 32'b0;
     addr_q          <= {SDRAM_ROW_W{1'b0}};
     bank_q          <= {SDRAM_BANK_W{1'b0}};
     cke_q           <= 1'b0;
-    dqm_q           <= {SDRAM_DQM_W{1'b0}};
+    dqm_q           <= {4{1'b0}};
     data_rd_en_q    <= 1'b1;
     dqm_buffer_q    <= {SDRAM_DQM_W{1'b0}};
 
@@ -606,7 +606,7 @@ begin
         addr_q[AUTO_PRECHARGE]  <= 1'b0;
 
         // Read mask (all bytes in burst)
-        dqm_q       <= {SDRAM_DQM_W{1'b0}};
+        dqm_q       <= {4{1'b0}};
     end
     //-----------------------------------------
     // STATE_WRITE0
@@ -616,13 +616,13 @@ begin
         command_q       <= CMD_WRITE;
         addr_q          <= addr_col_w;
         bank_q          <= addr_bank_w;
-        data_q          <= ram_write_data_w[15:0];
+        data_q          <= ram_write_data_w;
 
         // Disable auto precharge (auto close of row)
         addr_q[AUTO_PRECHARGE]  <= 1'b0;
 
         // Write mask
-        dqm_q           <= ~ram_wr_w[1:0];
+        dqm_q           <= ~ram_wr_w;
         dqm_buffer_q    <= ~ram_wr_w[3:2];
 
         data_rd_en_q    <= 1'b0;
@@ -635,13 +635,13 @@ begin
         // Burst continuation
         command_q   <= CMD_NOP;
 
-        data_q      <= data_buffer_q;
+        data_q      <= {16'b0, data_buffer_q};
 
         // Disable auto precharge (auto close of row)
         addr_q[AUTO_PRECHARGE]  <= 1'b0;
 
         // Write mask
-        dqm_q       <= dqm_buffer_q;
+        dqm_q       <= {2'b0, dqm_buffer_q};
     end
     endcase
 end
@@ -669,10 +669,10 @@ if (rst_i)
 else if (state_q == STATE_WRITE0)
     data_buffer_q <= ram_write_data_w[31:16];
 else if (rd_q[SDRAM_READ_LATENCY+1])
-    data_buffer_q <= sample_data_q;
+    data_buffer_q <= sample_data_q[31:16];
 
 // Read data output
-assign ram_read_data_w = {sample_data_q, data_buffer_q};
+assign ram_read_data_w = {sample_data_q};
 
 //-----------------------------------------------------------------
 // ACK
