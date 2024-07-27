@@ -137,7 +137,7 @@ class sdramChisel extends RawModule {
   val wdata2 = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(16.W))}
   val pre_waddr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(32.W))}
 
-  val row_addr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(13.W))}
+  val row_addr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(VecInit(Seq.fill(4)(0.U(13.W))))}
   val ba_addr = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(2.W))}
 
   val r_count = withClockAndReset(io.clk.asClock, io.cs.asAsyncReset){RegInit(0.U(7.W))}
@@ -155,31 +155,31 @@ class sdramChisel extends RawModule {
   val sdw2 = Module(new sdram_write)
   val sdw3 = Module(new sdram_write)
   val sdw4 = Module(new sdram_write)
-  sdw.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(12) === 0.U, io.clk, 0.U)
+  sdw.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(io.ba)(12) === 0.U, io.clk, 0.U)
   sdw.io.dqm := io.dqm(1,0)
   sdw.io.wdata := dq(15, 0)
-  sdw.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+  sdw.io.waddr := Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U)
   sdw.io.scount := Mux(cmd === write, 1.U, scount)
   sdw.io.clk := io.clk
 
-  sdw2.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(12) === 0.U , io.clk, 0.U)
+  sdw2.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(io.ba)(12) === 0.U , io.clk, 0.U)
   sdw2.io.dqm := io.dqm(3,2)
   sdw2.io.wdata := dq(31, 16)
-  sdw2.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+  sdw2.io.waddr := Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U)
   sdw2.io.scount := Mux(cmd === write, 1.U, scount) + 1.U
   sdw2.io.clk := io.clk
 
-  sdw3.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(12) === 1.U, io.clk, 0.U)
+  sdw3.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(io.ba)(12) === 1.U, io.clk, 0.U)
   sdw3.io.dqm := io.dqm(1,0)
   sdw3.io.wdata := dq(15, 0)
-  sdw3.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+  sdw3.io.waddr := Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U)
   sdw3.io.scount := Mux(cmd === write, 1.U, scount)
   sdw3.io.clk := io.clk
 
-  sdw4.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(12) === 1.U, io.clk, 0.U)
+  sdw4.io.wenable := Mux(((count > 1.U ) || cmd === write) && (burstlen >= 0.U && burstlen <= 3.U) && row_addr(io.ba)(12) === 1.U, io.clk, 0.U)
   sdw4.io.dqm := io.dqm(3,2)
   sdw4.io.wdata := dq(31, 16)
-  sdw4.io.waddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+  sdw4.io.waddr := Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U)
   sdw4.io.scount := Mux(cmd === write, 1.U, scount) + 1.U
   sdw4.io.clk := io.clk
 
@@ -189,27 +189,27 @@ class sdramChisel extends RawModule {
   val sdr3 = Module(new sdram_read)
   val sdr4 = Module(new sdram_read)
 
-  sdr.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(12) === 0.U, io.clk, 0.U)
-  sdr.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U), rraddr)
+  sdr.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(io.ba)(12) === 0.U, io.clk, 0.U)
+  sdr.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U), rraddr)
   sdr.io.clk := io.clk
 
-  sdr2.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(12) === 0.U, io.clk, 0.U)
-  sdr2.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U), rraddr) + 1.U
+  sdr2.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(io.ba)(12) === 0.U, io.clk, 0.U)
+  sdr2.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U), rraddr) + 1.U
   sdr2.io.clk := io.clk
  
-  sdr3.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(12) === 1.U, io.clk, 0.U)
-  sdr3.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U), rraddr)
+  sdr3.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(io.ba)(12) === 1.U, io.clk, 0.U)
+  sdr3.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U), rraddr)
   sdr3.io.clk := io.clk
 
-  sdr4.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(12) === 1.U, io.clk, 0.U)
-  sdr4.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U), rraddr) + 1.U
+  sdr4.io.renable := Mux((cas_count === 1.U || (cas_count === 0.U && r_count === 2.U)) && cmd =/= burst_terminate && row_addr(io.ba)(12) === 1.U, io.clk, 0.U)
+  sdr4.io.raddr := raddr + Mux(cmd === read, Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U), rraddr) + 1.U
   sdr4.io.clk := io.clk
 
 
   when (cmd === read) {
     r_count := Mux(burstlen === 0.U, 1.U, Mux(burstlen === 1.U, 2.U, Mux(burstlen === 2.U, 4.U, Mux(burstlen === 3.U, 8.U, 0.U))))
     cas_count := caslate - 1.U
-    rraddr := Cat(Fill(8, 0.U), row_addr, ba_addr, io.a(8, 1), 0.U)
+    rraddr := Cat(Fill(8, 0.U), row_addr(io.ba), io.ba, io.a(8, 1), 0.U)
     raddr := 0.U
     is_read := true.B
     //rrdata1 := sdr.io.rdata
@@ -225,15 +225,15 @@ class sdramChisel extends RawModule {
       raddr := raddr
     }
     
-    sdram_rdata1 := sdr.io.rdata
-    sdram_rdata2 := sdr2.io.rdata
+    sdram_rdata1 := Mux(row_addr(io.ba)(12) === 0.U, sdr.io.rdata, sdr3.io.rdata)
+    sdram_rdata2 := Mux(row_addr(io.ba)(12) === 0.U, sdr2.io.rdata, sdr4.io.rdata)
     //rrdata2 := sdr.io.rdata
     cas_count := cas_count - 1.U
   }.elsewhen(r_count > 0.U && cas_count === 0.U && cmd =/= burst_terminate) {
     r_count := r_count - 1.U
     
-    sdram_rdata1 := Mux(row_addr(12) === 0.U, sdr.io.rdata, sdr3.io.rdata)
-    sdram_rdata2 := Mux(row_addr(12) === 0.U, sdr2.io.rdata, sdr4.io.rdata)
+    sdram_rdata1 := Mux(row_addr(io.ba)(12) === 0.U, sdr.io.rdata, sdr3.io.rdata)
+    sdram_rdata2 := Mux(row_addr(io.ba)(12) === 0.U, sdr2.io.rdata, sdr4.io.rdata)
     when (r_count === 1.U) {
       is_read := false.B
      // t_enable := false.B
@@ -269,14 +269,19 @@ class sdramChisel extends RawModule {
     caslate := caslate
     opmode := opmode
   }
-  when (cmd === active) {
-    row_addr := io.a
+  when (cmd === active || cmd === read || cmd === write) {
+
+    
     ba_addr := io.ba
   }.otherwise {
-    row_addr := row_addr
+    
     ba_addr := ba_addr
   }
-
+  when (cmd === active) {
+    row_addr(io.ba) := io.a
+  }.otherwise{
+    row_addr(io.ba) := row_addr(io.ba)
+  }
 
 }
 
