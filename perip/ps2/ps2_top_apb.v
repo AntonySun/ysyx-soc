@@ -16,4 +16,27 @@ module ps2_top_apb(
   input         ps2_data
 );
 
+reg [7:0] data;
+reg [7:0] a_data;
+reg overflow;
+reg [7:0] k_count;
+reg isput;
+
+ps2keyboard ps2kb (
+  .clk(clock),
+  .ps2_clk(ps2_clk),
+  .ps2_data(ps2_data),
+  .rst(reset),
+  .data(data),
+  .a_data(a_data),
+  .overflow(overflow),
+  .k_count(k_count),
+  .isput(isput)
+);
+
+assign in_pslverr = 1'b0;
+assign in_pready  = in_penable && in_psel && !in_pwrite;
+assign in_prdata = {4{data}};
+
+
 endmodule
