@@ -1,5 +1,6 @@
 module keyboard_control(clk,clrn,ps2_clk,ps2_data,data,
-                    ready,nextdata_n,overflow, key_count, isput);
+                    ready,nextdata_n,overflow, key_count, isput, count
+                    );
     input clk,clrn,ps2_clk,ps2_data;
     input nextdata_n;
     output [7:0] data;
@@ -7,12 +8,13 @@ module keyboard_control(clk,clrn,ps2_clk,ps2_data,data,
     output reg overflow;     // fifo overflow
     output reg [7:0] key_count;
     output reg isput;
+    output reg [3:0] count;
     //output sampling;
     // internal signal, for test
     reg [9:0] buffer;        // ps2_data bits
     reg [7:0] fifo[7:0];     // data fifo
     reg [2:0] w_ptr,r_ptr;   // fifo write and read pointers
-    reg [3:0] count;  // count ps2_data bits
+      // count ps2_data bits
     // detect falling edge of ps2_clk
     reg [2:0] ps2_clk_sync;
      reg ww;
@@ -47,11 +49,12 @@ module keyboard_control(clk,clrn,ps2_clk,ps2_data,data,
                 end
             end
             if (sampling) begin
-              isput = 1;
+              
               if (count == 4'd10) begin
                 if ((buffer[0] == 0) &&  // start bit
                     (ps2_data)       &&  // stop bit
-                    (^buffer[9:1])) begin      // odd  parity
+                    (^buffer[9:1])) begin // odd  parity
+                    //isput <= 1;
                    // $display("receive %x", buffer[8:1]);
                     if (buffer[8:1] != 8'hf0 && buffer[8:1] != fifo[w_ptr - 1] && fifo[w_ptr - 1] != 8'hf0 && fifo[w_ptr - 1] != 8'he0)
                       key_count = key_count + 1;
@@ -69,6 +72,7 @@ module keyboard_control(clk,clrn,ps2_clk,ps2_data,data,
                     ready <= 1'b1;
                     overflow <= overflow | (r_ptr == (w_ptr + 3'b1));
                 end
+                //isput <= 0;
                 count <= 0;     // for next
               end else begin
                 buffer[count] <= ps2_data;  // store ps2_data
@@ -77,13 +81,20 @@ module keyboard_control(clk,clrn,ps2_clk,ps2_data,data,
             end
             else if(sampling == 0)begin
             nkc = nkc + 1;
-            if (nkc %12000000 == 0)begin
-             isput = 0; 
-            end
+            //if (nkc %12000000 == 0)begin
+            //isput <= 0; 
+            //end
             end
         end
     end
-  
+  always @(posedge clk) begin
+    if (count == 4'd10) begin
+      isput <= 1;
+    end
+    else begin
+      isput <= 0;
+    end
+  end
     assign data = fifo[r_ptr]; //always set output data
 
 endmodule

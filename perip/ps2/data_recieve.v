@@ -17,7 +17,6 @@ always @(posedge clk) begin
       o_data = r_data;
       nextdata_n = 0;
     end
-   
 end
 
 endmodule
