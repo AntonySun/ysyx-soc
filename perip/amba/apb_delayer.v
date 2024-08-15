@@ -24,8 +24,8 @@ module apb_delayer(
   input         out_pslverr
 );
  
-  reg [15:0] r_num;
-  reg [11:0] r_counter;
+  reg [19:0] r_num;
+  reg [15:0] r_counter;
   reg okk;
   reg [31:0] rdata;
  
@@ -47,8 +47,8 @@ module apb_delayer(
 
     if (in_paddr >= 32'ha0000000 && in_paddr < 32'hc0000000  ) begin
       if (in_psel == 1 && out_pready == 0 && okk == 1)begin
-        r_num <= r_num + 16'd80;
-      r_counter <= r_num[15:4];
+        r_num <= r_num + 20'd128;
+      r_counter <= r_num[19:4];
       end
       else if (okk == 0) begin
       if (r_counter > 1) begin
