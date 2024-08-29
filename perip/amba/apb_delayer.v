@@ -48,7 +48,7 @@ module apb_delayer(
     if (in_paddr >= 32'ha0000000 && in_paddr < 32'hc0000000  ) begin
       if (in_psel == 1 && out_pready == 0 && okk == 1)begin
         r_num <= r_num + 20'd128;
-      r_counter <= r_num[19:4];
+        r_counter <= r_num[19:4];
       end
       else if (okk == 0) begin
       if (r_counter > 1) begin
@@ -68,7 +68,7 @@ module apb_delayer(
   end
 
 always @(posedge clock) begin
-  if ( in_paddr >= 32'ha0000000 && in_paddr < 32'hc0000000) begin
+  if (in_paddr >= 32'ha0000000 && in_paddr < 32'hc0000000) begin
     if ((out_pready == 1 && in_penable == 1 && in_psel == 1)) begin   
       okk <= 0;
       rdata <= out_prdata;
